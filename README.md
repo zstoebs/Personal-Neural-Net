@@ -9,9 +9,12 @@ My intent is to continuously add functionality as long as I'm studying/working w
  - ReLU activation function
  - MSE function
  - Forward Propagation
- - Fit method == training 
+ - Fit method == training
+ - ReLU GD
+ - Basic backprop
  
  # To-do:
- - Implement backprop for SGD and a ReLU activation function
+ - Implement backprop with softmax GD
+ - Revise ReLU GD
  - Test on MNIST
  - Implement visualization methods
