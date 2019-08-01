@@ -19,5 +19,5 @@ My intent is to continuously add functionality as long as I'm studying/working w
  - Implement backprop with softmax GD
  - Revise ReLU GD
  - Test on MNIST
-  - Debug dimensions mismatch in forward prop
+   * DEBUG DIMENSIONS MISMATCH IN FORWARD PROP
  - Implement visualization methods
