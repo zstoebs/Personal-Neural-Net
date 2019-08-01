@@ -12,9 +12,12 @@ My intent is to continuously add functionality as long as I'm studying/working w
  - Fit method == training
  - ReLU GD
  - Basic backprop
+ - Predict method
+ - Accuracy method
  
  # To-do:
  - Implement backprop with softmax GD
  - Revise ReLU GD
  - Test on MNIST
+  - Debug dimensions mismatch in forward prop
  - Implement visualization methods
