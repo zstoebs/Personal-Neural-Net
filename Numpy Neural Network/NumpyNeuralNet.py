@@ -13,7 +13,7 @@ from sklearn.datasets.openml import fetch_openml
 class Network(object):
     
     #params will be defined as a list, otherwise manually enter args or dictionary
-    def __init__(self,n_input,n_output,loss='mse',optimization='GradientDescent',learning_rate=0.1,threshold=0.0,**kwargs):
+    def __init__(self,n_input,n_output,loss='mse',optimization='GradientDescent',learning_rate=0.1,threshold=0,**kwargs):
         self.n_input = n_input
         self.n_output = n_output
         self.loss = loss
@@ -23,7 +23,7 @@ class Network(object):
         self.final_weights = []
         self.biases = []
         self.activation = []
-        for key,value in kwargs.iteritems():
+        for key,value in kwargs.items():
             self.key = value
     
     #method to shuffle training sets into batches
@@ -36,7 +36,7 @@ class Network(object):
             
     #defining a layer constructor
     def layer(self,activation='relu',weights=None,biases=None):
-        if weights == None:
+        if weights.all() == None:
             weights = np.ones((self.n_input,self.n_output))
             biases = np.zeros((weights.shape[0],1))
             
@@ -50,7 +50,7 @@ class Network(object):
         
     #relu activation function
     def relu(self,X):
-        return np.max(X,self.threshold)
+        return np.maximum(X,self.threshold)
 
     #mse loss function
     def mse(self,y_pred,y_true):
@@ -63,7 +63,7 @@ class Network(object):
         ###FIGURE OUT GRADIENT DESCENT FOR SOFTMAX
         if activation == 'relu':
             r = self.relu(X)
-            return (X.T.dot((y_true - r))).T.dot(x) * self.learning_rate #return delta-W
+            return np.dot(np.dot(X,(y_true - r)).T,x) * self.learning_rate #return delta-W
     
     
     #defining forward propagation for any one layer
@@ -75,40 +75,54 @@ class Network(object):
     def backward_prop(self,inputs,weights,y_pred,y_true):
         updated_weights = []
         if self.optimization == 'GradientDescent':
-            for i in reversed(range(1,inputs.count)):
+            for i in reversed(range(1,len(inputs))):
                 delta = self.GradientDescent(inputs[i-1],inputs[i], weights[i-1], y_pred, y_true,self.activation[i-1])
                 updated_weights.append(weights[i-1] - delta)
         return updated_weights.reverse()
             
-        
+    #fit data to model by training    
     def fit(self,X_in,y_in,
             epochs=100,batch_size=0.2):
 
         #training the network
         for epoch in range(epochs):
             outputs = np.empty(X_in.shape[0]) #matrix for this epoch's output
-            for ind in range(X_in): #running through each instance
-                cur_inp = X_train[ind].copy()
+            for ind in range(len(X_in)): #running through each instance
+                cur_inp = X_in[ind].copy()
                 activities = [cur_inp,]
-                for i in range(self.final_weights.count): #forward prop through each layer
+                for i in range(len(self.final_weights)): #forward prop through each layer
                     w = self.final_weights[i]
                     b = self.biases[i]
                     a = self.activation[i]
                     cur_inp = self.forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
                     activities.append(cur_inp) #saving activations at each layer, not including initial inputs
                 outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index
-            
-            #backprop algo to update theta for next epoch
-            self.final_weights = self.backward_prop(activities,self.final_weights,outputs,y_in).copy()
+                
+                #backprop algo
+                self.final_weights = self.backward_prop(activities,self.final_weights,outputs,y_in).copy()
             
             cur_loss = self.mse(outputs,y_in) #loss for given epoch
             if epoch % 10 == 0:
                 print('Epoch:',epoch,'\tLoss:',cur_loss)
         
         print("Training concluded")
-
-
-
+    
+    #generate predictions    
+    def predict(self,X_in):
+        outputs = np.empty(X_in.shape[0]) #matrix for this epoch's output
+        for ind in range(X_in): #running through each instance
+            cur_inp = X_in[ind].copy()
+            for i in enumerate(self.final_weights): #forward prop through each layer
+                w = self.final_weights[i]
+                b = self.biases[i]
+                a = self.activation[i]
+                cur_inp = self.forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
+            outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index   
+        return outputs
+    
+    def accuracy(self,y_pred,y_true):
+        return np.sum((y_pred == y_true)) / y_true.shape[0]
+        
 
 #fetching mnist
 X,y = fetch_openml('mnist_784',version=1,return_X_y=True)
@@ -135,5 +149,13 @@ b2 = np.zeros((layer2_n_nodes,1))
 b3 = np.zeros((n_outputs,1))
 
 params = [W1, b1, W2, b2, W3, b3]
+
+model = Network(n_inputs, n_outputs)
+for pair in range(len(params) // 2):
+    model.layer(weights=params[pair*2],biases=params[pair*2 + 1])
+    
+model.fit(X_train,y_train)
+y_pred = model.predict(X_test)
+print(model.accuracy(y_pred, y_test))
     
     
