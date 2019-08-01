@@ -8,13 +8,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets.openml import fetch_openml
-from numpy import random
 
 #network class to call ops
 class Network(object):
     
     #params will be defined as a list, otherwise manually enter args or dictionary
-    def __init__(self,n_input,n_output,loss='mse',optimization='SGD',learning_rate=0.1,threshold=0.0,**kwargs):
+    def __init__(self,n_input,n_output,loss='mse',optimization='GradientDescent',learning_rate=0.1,threshold=0.0,**kwargs):
         self.n_input = n_input
         self.n_output = n_output
         self.loss = loss
@@ -26,14 +25,28 @@ class Network(object):
         self.activation = []
         for key,value in kwargs.iteritems():
             self.key = value
+    
+    #method to shuffle training sets into batches
+    def shuffle_batch(self,X, y, batch_size):
+        rnd_idx = np.random.permutation(len(X))
+        n_batches = len(X) // batch_size
+        for batch_idx in np.array_split(rnd_idx, n_batches):
+            X_batch, y_batch = X[batch_idx], y[batch_idx]
+            yield X_batch, y_batch
             
     #defining a layer constructor
-    def layer(activation='relu',weights=np.ones((n_input,n_output)),biases=np.zeros((weights.shape[0],1))):
+    def layer(self,activation='relu',weights=None,biases=None):
+        if weights == None:
+            weights = np.ones((self.n_input,self.n_output))
+            biases = np.zeros((weights.shape[0],1))
+            
         self.final_weights.append(weights)
         self.biases.append(biases)
         
         if activation == 'relu':
             self.activation.append('relu')
+        if activation == 'softmax':
+            self.activation.append('softmax')
         
     #relu activation function
     def relu(self,X):
@@ -44,9 +57,14 @@ class Network(object):
         return (1/y_true.shape[0]) * np.sum(np.square(y_pred - y_true))
     
     #SGD optimization function
-    def SGD(self,X,theta,y_pred,y_true):
-        return theta
-    #NEED TO FIGURE OUT HOW TO IMPLEMENT RELU AND SGD IN BACKPROP
+    def GradientDescent(self,x,X,theta,y_pred,y_true,activation):
+        if activation =='softmax':
+            return (y_pred - y_true)
+        ###FIGURE OUT GRADIENT DESCENT FOR SOFTMAX
+        if activation == 'relu':
+            r = self.relu(X)
+            return (X.T.dot((y_true - r))).T.dot(x) * self.learning_rate #return delta-W
+    
     
     #defining forward propagation for any one layer
     def forward_prop(self,X,theta,b,activation):
@@ -56,10 +74,11 @@ class Network(object):
     #defining backprop
     def backward_prop(self,inputs,weights,y_pred,y_true):
         updated_weights = []
-        if self.optimization == 'SGD':
-            for i in reversed(range(inputs.count)):
-                updated_weights.append(self.SGD(inputs, weights, y_pred, y_true))
-        return updated_weights
+        if self.optimization == 'GradientDescent':
+            for i in reversed(range(1,inputs.count)):
+                delta = self.GradientDescent(inputs[i-1],inputs[i], weights[i-1], y_pred, y_true,self.activation[i-1])
+                updated_weights.append(weights[i-1] - delta)
+        return updated_weights.reverse()
             
         
     def fit(self,X_in,y_in,
@@ -70,13 +89,13 @@ class Network(object):
             outputs = np.empty(X_in.shape[0]) #matrix for this epoch's output
             for ind in range(X_in): #running through each instance
                 cur_inp = X_train[ind].copy()
-                activities = []
+                activities = [cur_inp,]
                 for i in range(self.final_weights.count): #forward prop through each layer
                     w = self.final_weights[i]
                     b = self.biases[i]
                     a = self.activation[i]
                     cur_inp = self.forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
-                    activities.append(cur_inp) #saving activations at each layer
+                    activities.append(cur_inp) #saving activations at each layer, not including initial inputs
                 outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index
             
             #backprop algo to update theta for next epoch
@@ -108,9 +127,9 @@ n_outputs = np.unique(y).shape[0]
 layer1_n_nodes = int(n_inputs/2)
 layer2_n_nodes = int(np.floor(np.sqrt(n_inputs)))
 
-W1 = random.randn(n_inputs,layer1_n_nodes)
-W2 = random.randn(layer1_n_nodes,layer2_n_nodes)
-W3 = random.randn(layer2_n_nodes,n_outputs)
+W1 = np.random.randn(n_inputs,layer1_n_nodes)
+W2 = np.random.randn(layer1_n_nodes,layer2_n_nodes)
+W3 = np.random.randn(layer2_n_nodes,n_outputs)
 b1 = np.zeros((layer1_n_nodes,1))
 b2 = np.zeros((layer2_n_nodes,1))
 b3 = np.zeros((n_outputs,1))
