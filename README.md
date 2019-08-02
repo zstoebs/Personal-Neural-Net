@@ -23,9 +23,9 @@ THE MODEL RUNS!!!!!! But it's really slow and has an exploding gradient issue.
  # To-do:
  - Test on MNIST
  - Fix exploding gradient problem and overfitting
-   *Batch normalization
-   *Regularization
-   *Xavier and He initialization
+   - Batch normalization
+   - Regularization
+   - Xavier and He initialization
  - Implement visualization methods
  - Optimize CPU usage
  - Make it DRYer
