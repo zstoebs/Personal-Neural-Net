@@ -4,16 +4,40 @@
 #Descrip: creating a neural net by hand using raw numpy
 #Inspired by this article: https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
 
-
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.datasets.openml import fetch_openml
+import tensorflow as tf
+
+np.random.seed(42)
+
+#fetching mnist
+(X_train, y_train), (X_test, y_test) = tf.keras.datasets.mnist.load_data()
+X_train = X_train.astype(np.float64).reshape(-1, 28*28) / 255.0
+X_test = X_test.astype(np.float64).reshape(-1, 28*28) / 255.0
+y_train = y_train.astype(np.int64)
+y_test = y_test.astype(np.int64)
+X_valid, X_train = X_train[:5000], X_train[5000:]
+y_valid, y_train = y_train[:5000], y_train[5000:]
+
+n_inputs = X_train.shape[1]
+n_outputs = np.unique(y_train).shape[0]
+layer1_n_nodes = int(n_inputs/2)
+layer2_n_nodes = int(np.floor(np.sqrt(n_inputs)))
+
+W1 = np.random.randn(n_inputs,layer1_n_nodes)
+W2 = np.random.randn(layer1_n_nodes,layer2_n_nodes)
+W3 = np.random.randn(layer2_n_nodes,n_outputs)
+b1 = np.zeros((layer1_n_nodes,1))
+b2 = np.zeros((layer2_n_nodes,1))
+b3 = np.zeros((n_outputs,1))
+
+params = [W1, b1, W2, b2, W3, b3]
 
 #network class to call ops
 class Network(object):
     
     #params will be defined as a list, otherwise manually enter args or dictionary
-    def __init__(self,n_input,n_output,loss='mse',optimization='GradientDescent',learning_rate=0.1,threshold=0,**kwargs):
+    def __init__(self,n_input,n_output,loss='mse',optimization='SGD',learning_rate=0.01,threshold=0,**kwargs):
         self.n_input = n_input
         self.n_output = n_output
         self.loss = loss
@@ -27,7 +51,7 @@ class Network(object):
             self.key = value
     
     #method to shuffle training sets into batches
-    def shuffle_batch(self,X, y, batch_size):
+    def __shuffle_batch(self,X, y, batch_size):
         rnd_idx = np.random.permutation(len(X))
         n_batches = len(X) // batch_size
         for batch_idx in np.array_split(rnd_idx, n_batches):
@@ -49,36 +73,32 @@ class Network(object):
             self.activation.append('softmax')
         
     #relu activation function
-    def relu(self,X):
+    def __relu(self,X):
         return np.maximum(X,self.threshold)
 
     #mse loss function
-    def mse(self,y_pred,y_true):
-        return (1/y_true.shape[0]) * np.sum(np.square(y_pred - y_true))
+    def __mse(self,y_pred,y_true):
+        return (1/len(y_true)) * np.sum(np.square(y_pred - y_true))
     
     #SGD optimization function
-    def GradientDescent(self,x,X,theta,y_pred,y_true,activation):
-        if activation =='softmax':
-            return (y_pred - y_true)
-        ###FIGURE OUT GRADIENT DESCENT FOR SOFTMAX
-        if activation == 'relu':
-            r = self.relu(X)
-            return np.dot(np.dot(X,(y_true - r)).T,x) * self.learning_rate #return delta-W
+    def __SGD(self,X,theta,y_pred,y_true):
+        if self.loss == 'mse':
+            return 2 * np.dot(X.T,X * (y_true - y_pred)) * self.learning_rate #return delta-W
     
     
     #defining forward propagation for any one layer
-    def forward_prop(self,X,theta,b,activation):
+    def __forward_prop(self,X,theta,b,activation):
         if activation == 'relu':
-            return self.relu(np.dot(X,theta) + b)
+            return self.__relu(np.dot(X,theta).T + b)
         
     #defining backprop
-    def backward_prop(self,inputs,weights,y_pred,y_true):
+    def __backward_prop(self,inputs,weights,y_pred,y_true):
         updated_weights = []
-        if self.optimization == 'GradientDescent':
-            for i in reversed(range(1,len(inputs))):
-                delta = self.GradientDescent(inputs[i-1],inputs[i], weights[i-1], y_pred, y_true,self.activation[i-1])
-                updated_weights.append(weights[i-1] - delta)
-        return updated_weights.reverse()
+        if self.optimization == 'SGD':
+            for i in reversed(range(len(weights))):
+                delta = self.__SGD(inputs[i], weights[i], y_pred, y_true)
+                updated_weights.append((weights[i] - delta[0][0]*np.ones(weights[i].shape)))     
+        return list(reversed(updated_weights))
             
     #fit data to model by training    
     def fit(self,X_in,y_in,
@@ -87,68 +107,72 @@ class Network(object):
         #training the network
         for epoch in range(epochs):
             outputs = np.empty(X_in.shape[0]) #matrix for this epoch's output
-            for ind in range(len(X_in)): #running through each instance
-                cur_inp = X_in[ind].copy()
-                activities = [cur_inp,]
+            for ind,cur_inp in enumerate(X_in): #running through each instance
+                activities = []
                 for i in range(len(self.final_weights)): #forward prop through each layer
                     w = self.final_weights[i]
                     b = self.biases[i]
                     a = self.activation[i]
-                    cur_inp = self.forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
+                    cur_inp = self.__forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
                     activities.append(cur_inp) #saving activations at each layer, not including initial inputs
                 outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index
                 
-                #backprop algo
-                self.final_weights = self.backward_prop(activities,self.final_weights,outputs,y_in).copy()
+                #backprop algorithm given batch_size
+                sample_y_pred,sample_y_true,sample_activities = self.__batch_predict(X_in, y_in,batch_size=batch_size)
+                self.final_weights = self.__backward_prop(sample_activities,self.final_weights,sample_y_pred,sample_y_true)
             
-            cur_loss = self.mse(outputs,y_in) #loss for given epoch
+            cur_loss = self.__mse(outputs,y_in) #loss for given epoch
             if epoch % 10 == 0:
                 print('Epoch:',epoch,'\tLoss:',cur_loss)
         
         print("Training concluded")
+     
+     #private helper method   
+    def __batch_predict(self,X_in,y_in,batch_size=0.2):
+        
+        if self.optimization == 'SGD':
+            rnd_ind = np.random.permutation(len(X_in))[0]
+            X_batch,y_batch = np.reshape(X_in[rnd_ind],(-1,1)),y_in[rnd_ind]
+            cur_inp = X_batch.copy()
+            activities = []
+            for i in range(len(self.final_weights)): #forward prop through each layer
+                w = self.final_weights[i]
+                b = self.biases[i]
+                a = self.activation[i]
+                cur_inp = self.__forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
+                activities.append(cur_inp) #saving activations at each layer, not including initial inputs
+            outputs = np.argmax(activities[-1]) #discerning output from max activation at index
+            return outputs,np.int64(y_batch),activities             
+            
+        else:
+            X_batch,y_batch = self.__shuffle_batch(X_in,y_in,batch_size)
+            
+        outputs = np.empty(X_batch.shape[0])
+        for ind,cur_inp in enumerate(X_batch): #running through each instance
+            activities = []
+            for i in range(len(self.final_weights)): #forward prop through each layer
+                w = self.final_weights[i]
+                b = self.biases[i]
+                a = self.activation[i]
+                cur_inp = self.__forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
+                activities.append(cur_inp) #saving activations at each layer, not including initial inputs
+            outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index
+        return outputs,y_batch,activities      
     
     #generate predictions    
     def predict(self,X_in):
         outputs = np.empty(X_in.shape[0]) #matrix for this epoch's output
-        for ind in range(X_in): #running through each instance
-            cur_inp = X_in[ind].copy()
-            for i in enumerate(self.final_weights): #forward prop through each layer
+        for ind,cur_inp in enumerate(X_in): #running through each instance
+            for i in range(len(self.final_weights)): #forward prop through each layer
                 w = self.final_weights[i]
                 b = self.biases[i]
                 a = self.activation[i]
-                cur_inp = self.forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
+                cur_inp = self.__forward_prop(cur_inp.reshape(1,-1),w,b,a).copy()
             outputs[ind] = np.argmax(activities[-1]) #discerning output from max activation at index   
         return outputs
     
     def accuracy(self,y_pred,y_true):
-        return np.sum((y_pred == y_true)) / y_true.shape[0]
-        
-
-#fetching mnist
-X,y = fetch_openml('mnist_784',version=1,return_X_y=True)
-
-#splitting data
-test_size = 10000
-X_train = X[:-2*test_size] #50,000 x 784
-y_train = y[:-2*test_size]
-X_val = X[-2*test_size:-test_size] #10,000 x 784
-y_val = y[-2*test_size:-test_size]
-X_test = X[-test_size:] #10,000 x 784
-y_test = y[-test_size:]
-
-n_inputs = X_train.shape[1]
-n_outputs = np.unique(y).shape[0]
-layer1_n_nodes = int(n_inputs/2)
-layer2_n_nodes = int(np.floor(np.sqrt(n_inputs)))
-
-W1 = np.random.randn(n_inputs,layer1_n_nodes)
-W2 = np.random.randn(layer1_n_nodes,layer2_n_nodes)
-W3 = np.random.randn(layer2_n_nodes,n_outputs)
-b1 = np.zeros((layer1_n_nodes,1))
-b2 = np.zeros((layer2_n_nodes,1))
-b3 = np.zeros((n_outputs,1))
-
-params = [W1, b1, W2, b2, W3, b3]
+        return np.sum((y_pred == y_true)) / len(y_true)
 
 model = Network(n_inputs, n_outputs)
 for pair in range(len(params) // 2):
@@ -157,5 +181,4 @@ for pair in range(len(params) // 2):
 model.fit(X_train,y_train)
 y_pred = model.predict(X_test)
 print(model.accuracy(y_pred, y_test))
-    
     
