@@ -5,7 +5,7 @@ My intent is to continuously add functionality as long as I'm studying/working w
 
 I import the dataset using TensorFlow because 1. it loads faster than the SKLearn dataset and 2. SKlearn encodes the target set as strings (why THE FUCK does it code a written number as a string?)
 
-THE MODEL RUNS!!!!!! But it's really slow and has an exploding gradient issue.
+THE MODEL RUNS!!!!!! But it has an exploding gradient issue and the algorithms are probably incorrect somewhere. Loss comes out to a reassuring 28 from epochs 10 to 100... when it should be ideally less than one. The accuracy thus resolves to a measly 9.8%. 
 
 # Current Progress:
  - Network constructor
@@ -19,9 +19,11 @@ THE MODEL RUNS!!!!!! But it's really slow and has an exploding gradient issue.
  - Predict method
  - Batch predict method
  - Accuracy method
+ - Fixed slowdown
  
  # To-do:
  - Test on MNIST
+ - Implement early stopping
  - Fix exploding gradient problem and overfitting
    - Batch normalization
    - Regularization
@@ -29,3 +31,4 @@ THE MODEL RUNS!!!!!! But it's really slow and has an exploding gradient issue.
  - Implement visualization methods
  - Optimize CPU usage
  - Make it DRYer
+ 
