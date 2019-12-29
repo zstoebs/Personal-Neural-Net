@@ -1,5 +1,5 @@
 # PNN
-### A menagerie of personal neural network architectures for my better understanding of the state-of-the-art!
+### A menagerie of personal neural network architectures for my better understanding!
 
 **Models**:
 - Raw numpy neural net
