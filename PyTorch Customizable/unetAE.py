@@ -1,7 +1,8 @@
 """
 @author Zach Stoebner
 @date November 2019
-@details An U-Net AE implementation with the encoder and decoder separated
+@details A U-Net AE implementation with the encoder and decoder separated. You can plug it into UNIT
+in lieu of the encoder and decoder with the intent to better adapt MRI. 
 """
 
 from torch import nn
